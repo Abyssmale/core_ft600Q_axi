@@ -31,21 +31,21 @@ module ft60x_fifo
     ,input           rst_i
     ,input           ftdi_rxf_i
     ,input           ftdi_txe_i
-    ,input  [ 31:0]  ftdi_data_in_i
+    ,input  [ 15:0]  ftdi_data_in_i
     ,input  [  3:0]  ftdi_be_in_i
     ,input           inport_valid_i
-    ,input  [ 31:0]  inport_data_i
+    ,input  [ 15:0]  inport_data_i
     ,input           outport_accept_i
 
     // Outputs
     ,output          ftdi_wrn_o
     ,output          ftdi_rdn_o
     ,output          ftdi_oen_o
-    ,output [ 31:0]  ftdi_data_out_o
+    ,output [ 15:0]  ftdi_data_out_o
     ,output [  3:0]  ftdi_be_out_o
     ,output          inport_accept_o
     ,output          outport_valid_o
-    ,output [ 31:0]  outport_data_o
+    ,output [ 15:0]  outport_data_o
 );
 
 
@@ -59,7 +59,7 @@ reg  [10:0] rx_rd_ptr_q;
 wire [10:0] rx_rd_ptr_next_w = rx_rd_ptr_q + 11'd1;
 
 // Retime input data
-reg  [31:0] rd_data_q;
+reg  [15:0] rd_data_q;
 reg         rd_valid_q;
 wire        rx_valid_w;
 
@@ -71,7 +71,7 @@ else
 
 always @ (posedge clk_i or posedge rst_i)
 if (rst_i)
-    rd_data_q  <= 32'b0;
+    rd_data_q  <= 16'b0;
 else
     rd_data_q  <= ftdi_data_in_i;
 
@@ -82,7 +82,7 @@ if (rst_i)
 else if (rd_valid_q)
     rx_wr_ptr_q  <= rx_wr_ptr_next_w;
 
-wire [31:0] rx_data_w;
+wire [15:0] rx_data_w;
 
 ft60x_ram_dp
 u_rx_ram
@@ -101,7 +101,7 @@ u_rx_ram
     // Read Port
     ,.wr1_i(1'b0)
     ,.addr1_i(rx_rd_ptr_q)
-    ,.data1_i(32'b0)
+    ,.data1_i(16'b0)
     ,.data1_o(rx_data_w)
 );
 
@@ -135,13 +135,13 @@ else if (read_ok_w && ((!outport_valid_o) || (outport_valid_o && outport_accept_
 
 // Read Skid Buffer
 reg        rd_skid_q;
-reg [31:0] rd_skid_data_q;
+reg [15:0] rd_skid_data_q;
 
 always @ (posedge clk_i or posedge rst_i)
 if (rst_i)
 begin
     rd_skid_q      <= 1'b0;
-    rd_skid_data_q <= 32'b0;
+    rd_skid_data_q <= 16'b0;
 end
 else if (outport_valid_o && !outport_accept_i)
 begin
@@ -151,7 +151,7 @@ end
 else
 begin
     rd_skid_q      <= 1'b0;
-    rd_skid_data_q <= 32'b0;
+    rd_skid_data_q <= 16'b0;
 end
 
 assign outport_valid_o = rd_skid_q | rd_q;
@@ -166,7 +166,7 @@ reg  [10:0] tx_rd_ptr_q;
 wire [10:0] tx_rd_ptr_next_w = tx_rd_ptr_q + 11'd1;
 wire [10:0] tx_rd_ptr_prev_w = tx_rd_ptr_q - 11'd2;
 
-wire [31:0] tx_data_w;
+wire [16:0] tx_data_w;
 
 ft60x_ram_dp
 u_tx_ram
@@ -185,7 +185,7 @@ u_tx_ram
     // Read Port
     ,.wr1_i(1'b0)
     ,.addr1_i(tx_rd_ptr_q)
-    ,.data1_i(32'b0)
+    ,.data1_i(16'b0)
     ,.data1_o(tx_data_w)
 );
 
@@ -352,7 +352,7 @@ else if ((state_q == STATE_TX) && !tx_space_w)
 reg        rdn_q;
 reg        wrn_q;
 reg        oen_q;
-reg [35:0] data_q;
+reg [19:0] data_q;
 
 always @ (posedge clk_i or posedge rst_i)
 if (rst_i)
@@ -380,15 +380,15 @@ else if (state_q == STATE_TX && next_state_r == STATE_TURNAROUND)
 
 always @ (posedge clk_i or posedge rst_i)
 if (rst_i)
-    data_q  <= 36'b0;
+    data_q  <= 20'b0;
 else
     data_q  <= {4'b1111, tx_data_w};
 
 assign ftdi_wrn_o      = wrn_q;
 assign ftdi_rdn_o      = rdn_q;
 assign ftdi_oen_o      = oen_q;
-assign ftdi_data_out_o = data_q[31:0];
-assign ftdi_be_out_o   = data_q[35:32];
+assign ftdi_data_out_o = data_q[15:0];
+assign ftdi_be_out_o   = data_q[19:16];
 
 endmodule
 
@@ -399,17 +399,17 @@ module ft60x_ram_dp
      input           clk0_i
     ,input           rst0_i
     ,input  [ 10:0]  addr0_i
-    ,input  [ 31:0]  data0_i
+    ,input  [ 15:0]  data0_i
     ,input           wr0_i
     ,input           clk1_i
     ,input           rst1_i
     ,input  [ 10:0]  addr1_i
-    ,input  [ 31:0]  data1_i
+    ,input  [ 15:0]  data1_i
     ,input           wr1_i
 
     // Outputs
-    ,output [ 31:0]  data0_o
-    ,output [ 31:0]  data1_o
+    ,output [ 15:0]  data0_o
+    ,output [ 15:0]  data1_o
 );
 
 //-----------------------------------------------------------------
@@ -417,18 +417,18 @@ module ft60x_ram_dp
 // Mode: Read First
 //-----------------------------------------------------------------
 /* verilator lint_off MULTIDRIVEN */
-reg [31:0]   ram [2047:0] /*verilator public*/;
+reg [15:0]   ram [2047:0] /*verilator public*/;
 /* verilator lint_on MULTIDRIVEN */
 
-reg [31:0] ram_read0_q;
-reg [31:0] ram_read1_q;
+reg [15:0] ram_read0_q;
+reg [15:0] ram_read1_q;
 
 
 // Synchronous write
 always @ (posedge clk0_i)
 begin
     if (wr0_i)
-        ram[addr0_i][31:0] <= data0_i[31:0];
+        ram[addr0_i][15:0] <= data0_i[15:0];
 
     ram_read0_q <= ram[addr0_i];
 end
@@ -436,7 +436,7 @@ end
 always @ (posedge clk1_i)
 begin
     if (wr1_i)
-        ram[addr1_i][31:0] <= data1_i[31:0];
+        ram[addr1_i][15:0] <= data1_i[15:0];
 
     ram_read1_q <= ram[addr1_i];
 end
